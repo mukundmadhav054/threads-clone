@@ -11,6 +11,7 @@ import LogoutButton from "./components/LogoutButton";
 
 const App = () => {
   const user = useRecoilValue(userAtom);
+  console.log(user)
   return (
     <Container maxW={"620px"}>
       <Header />
