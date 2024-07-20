@@ -1,6 +1,7 @@
 import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
 import generateTokenAndSetCookie from "../utils/helpers/generateTokenAndSetCookie.js";
+import { v2 as cloudinary } from "cloudinary";
 
 const signupUser = async (req, res) => {
   try {
@@ -23,14 +24,14 @@ const signupUser = async (req, res) => {
 
     if (newUser) {
       generateTokenAndSetCookie(newUser._id, res);
-      res
-        .status(201)
-        .json({
-          _id: newUser._id,
-          name: newUser.name,
-          email: newUser.email,
-          username: newUser.username,
-        });
+      res.status(201).json({
+        _id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        username: newUser.username,
+        bio: newUser.bio,
+        profilePicture: newUser.profilePicture,
+      });
     } else {
       res.status(400).json({ error: "Invalid user data" });
     }
@@ -51,14 +52,14 @@ const loginUser = async (req, res) => {
     const isPasswordCorrect = bcrypt.compare(password, user?.password || "");
     if (user && isPasswordCorrect) {
       generateTokenAndSetCookie(user._id, res);
-      res
-        .status(200)
-        .json({
-          _id: user._id,
-          name: user.name,
-          email: user.email,
-          username: user.username,
-        });
+      res.status(200).json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        bio: user.bio,
+        profilePicture: user.profilePicture,
+      });
     } else {
       res.status(400).json({ error: "Invalid username or password" });
     }
@@ -113,7 +114,9 @@ const followUnfollowUser = async (req, res) => {
 };
 
 const updateUser = async (req, res) => {
-  const { name, email, username, password, profilePicture, bio } = req.body;
+  const { name, email, username, password, bio } = req.body;
+  let { profilePicture } = req.body;
+
   const userId = req.user._id;
   try {
     let user = await User.findById(userId);
@@ -132,6 +135,16 @@ const updateUser = async (req, res) => {
       user.password = await bcrypt.hash(password, salt);
     }
 
+    if (profilePicture) {
+      if (user.profilePicture) {
+        await cloudinary.uploader.destroy(
+          user.profilePicture.split("/").pop().split(".")[0]
+        );
+      }
+      const uploadedResponse = await cloudinary.uploader.upload(profilePicture);
+      profilePicture = uploadedResponse.secure_url;
+    }
+
     user.name = name || user.name;
     user.email = email || user.email;
     user.username = username || user.username;
@@ -140,7 +153,10 @@ const updateUser = async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({ message: "Profile updated successfully", user });
+    // Remove password from the response
+    user.password = null;
+
+    res.status(200).json(user);
   } catch (error) {
     res.status(500).json({ error: error.message });
     console.log("Error in updateUser:", error.message);
