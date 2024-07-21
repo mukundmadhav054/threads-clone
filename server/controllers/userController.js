@@ -2,10 +2,17 @@ import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
 import generateTokenAndSetCookie from "../utils/helpers/generateTokenAndSetCookie.js";
 import { v2 as cloudinary } from "cloudinary";
+import mongoose from "mongoose";
 
 const signupUser = async (req, res) => {
   try {
     const { name, email, username, password } = req.body;
+    if (!name || !email || !username || !password) {
+      return res
+        .status(400)
+        .json({ error: "Please provide all the required details" });
+    }
+
     const user = await User.findOne({ $or: [{ email }, { username }] });
     if (user) {
       return res.status(400).json({ error: "User already exists" });
@@ -164,10 +171,23 @@ const updateUser = async (req, res) => {
 };
 
 const getUserProfile = async (req, res) => {
+  // We will fetch user profile either with username or userId
+  // Query is either username or userId
+  const { query } = req.params;
   try {
-    const user = await User.findOne({ username: req.params.username })
-      .select("-password")
-      .select("-updatedAt");
+    let user;
+    // if query is userId
+    if (mongoose.Types.ObjectId.isValid(query)) {
+      user = await User.findOne({ _id: query })
+        .select("-password")
+        .select("-updatedAt");
+    } else {
+      // if query is username
+      user = await User.findOne({ username: query })
+        .select("-password")
+        .select("-updatedAt");
+    }
+
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
